@@ -1,3 +1,8 @@
+/* 
+    A parallel implementation of automata(game of life)
+    Author: Zhixuan Wu
+    Date: 06/04/2021
+*/
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -6,30 +11,28 @@
 #include <ctype.h>
 #include <omp.h>
 
-/* 
-    A parallel implementation of automata(game of life)
-    Author: Zhixuan Wu
-    Date: 06/04/2021
-*/
+//gcc -Wall -std=c99 -fopenmp automata.c
 int main(int argc, char *argv[])
 {
 
+    double t1, t2;
+
     if (argc < 5)
     {
-        printf("wrong usage");
+        printf("wrong usage\n");
         exit(0);
     }
 
-    int X; /* # GENERATION */
-    int Y; /* SIZE OF MAP */
-    int Z; /* # THREADS */
+    int X;            /* # GENERATION */
+    int Y;            /* SIZE OF MAP */
+    int thread_count; /* # THREADS */
 
     char filename[128]; /* INPUT FILENAME */
     FILE *fp1, *fp2;
 
     X = atoi(argv[1]);
     Y = atoi(argv[2]);
-    Z = atoi(argv[3]);
+    thread_count = atoi(argv[3]);
 
     int map[Y][Y];     /* INPUT MAP */
     int map_out[Y][Y]; /* OUTPUT MAP */
@@ -61,23 +64,31 @@ int main(int argc, char *argv[])
     }
 
     /* ACTUAL CELLULAR AUTOMATON */
+    t1 = omp_get_wtime();
+
     int gen;
     for (gen = 0; gen < X; gen++)
     { // LOOP FOR GENERATIONS
 
         // LOOP THORUGH THE MAP AND CALCULATE EACH CELL
+        //# pragma omp for schedule(dynamic)
+        //printf("n_thread: %d \n", omp_get_num_threads());
+        //t1 = omp_get_wtime();
         for (i = 0; i < Y; i++)
+#pragma omp parallel num_threads(thread_count)
         {
+//# pragma omp for schedule(static, 10)
+#pragma omp for schedule(static)
             for (j = 0; j < Y; j++)
             {
-
-                /*  check neighbor of each cell
+                //printf("%d> i = %d; j = %d \n", omp_get_thread_num(), i, j);
+                /*  check neighbors of each cell
                         general case(not corner ones)
                             ->  they have 8 neighbors
                                 map[i-1][j-1]  map[i-1][j]  map[i-1][j+1]
                                 map[i][j-1]    [*ITSELF*]   map[i][j+1]
                                 map[i+1][j-1]  map[i+1][j]  map[i+1][j+1]
-                                ->  count which ones of these have are alive
+                                ->  count which ones of these are alive
                                     if count == 2, no change
                                     if count == 3, the cell becomes alive in the next gen regardless of its present state
                                     if count != 2 && count != 3, it dies
@@ -163,9 +174,14 @@ int main(int argc, char *argv[])
                     map_out[i][j] = cell;
                 else
                     map[i][j] = cell;
+
+                //sleep(1);
             }
         }
     }
+
+    t2 = omp_get_wtime();
+    printf("CPU time used: %.2f - %.2f = %.2f sec \n", t2, t1, t2 - t1);
 
     if (X % 2 != 0)
     {
